@@ -1,7 +1,7 @@
 {
     "apps": {
         "models": {
-            "models": ["app.models", "aerich.models"],
+            "models": ["pi3.models", "aerich.models"],
             "default_connection": "default",
         }
     },
