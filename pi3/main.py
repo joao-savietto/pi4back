@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from tortoise import Tortoise
 from tortoise.contrib.fastapi import register_tortoise
+from pi3.routes.measurements import router as measurements_router
 
 app = FastAPI(title="FastAPI with Tortoise ORM")
 
@@ -11,6 +12,9 @@ register_tortoise(
     generate_schemas=False,
     add_exception_handlers=True,
 )
+
+# Include routers
+app.include_router(measurements_router)
 
 @app.get("/")
 async def root():
