@@ -9,9 +9,9 @@ services:
       - redis_data:/data
 
   web:
-    image: pi3back
+    image: pi4back
     build: .
-    command: ./start_django.sh python manage.py runserver 0.0.0.0:8000
+    command: ./start_fastapi.sh
     volumes:
       - .:/app
     ports:
@@ -24,7 +24,7 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - IS_DJANGO_CONTAINER=true
+      - RUN_MIGRATIONS=true
       - ENVIRONMENT=local
 
   celery:

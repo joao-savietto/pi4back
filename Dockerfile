@@ -14,19 +14,19 @@ WORKDIR /app
 # Copy the project files into the container
 COPY . /app/
 
-# Make the start_django.sh script executable
-RUN sudo chmod +x start_django.sh
+# Make the start_fastapi.sh script executable
+RUN chmod +x start_fastapi.sh
 
 # Install MySQL driver and other necessary packages
-RUN sudo apt-get update && sudo apt-get install -y \
+RUN apt-get update && apt-get install -y \
     default-libmysqlclient-dev \
     build-essential \
     pkg-config \
     python3-dev \
     default-mysql-client \
-    && sudo apt-get clean
+    && apt-get clean
 
 ENV CHROMEDRIVER=/usr/bin/chromedriver
 RUN pip install -r requirements.txt
 
-ENTRYPOINT ["/app/start_django.sh"]
+ENTRYPOINT ["/app/start_fastapi.sh"]

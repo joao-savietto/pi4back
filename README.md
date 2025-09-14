@@ -1,5 +1,5 @@
 # Introdução
-Este é um projeto de exemplo para demonstrar a utilização do Git e do GitHub.
+Este é um projeto FastAPI com Tortoise ORM e MySQL.
 
 # Executando o projeto
 
@@ -22,5 +22,5 @@ pip install -r requirements.txt
 
 ## 4. Executar o projeto no modo local
 ```bash
-python manage.py runserver
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
