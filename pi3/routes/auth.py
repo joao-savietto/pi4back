@@ -1,0 +1,96 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from typing import Optional
+from pi3.auth.utils import (
+    get_password_hash, 
+    verify_password,
+    create_access_token,
+    create_refresh_token
+)
+from pi3.models.users import User
+from pi3.auth.dependencies import get_current_user
+
+router = APIRouter(prefix="/auth", tags=["authentication"])
+
+class UserCreate(BaseModel):
+    name: str
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    refresh_token: Optional[str] = None
+
+class UserInfo(BaseModel):
+    id: int
+    name: str
+    username: str
+
+@router.post("/register", response_model=UserInfo)
+async def register_user(user: UserCreate):
+    """Register a new user"""
+    # Check if user already exists
+    existing_user = await User.filter(username=user.username).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+    
+    # Create new user with hashed password
+    hashed_password = get_password_hash(user.password)
+    db_user = await User.create(
+        name=user.name,
+        username=user.username,
+        hashed_password=hashed_password
+    )
+    
+    return UserInfo(
+        id=db_user.id,
+        name=db_user.name,
+        username=db_user.username
+    )
+
+@router.post("/login", response_model=TokenResponse)
+async def login_user(credentials: UserLogin):
+    """Login user and return access token"""
+    # Find user by username
+    user = await User.filter(username=credentials.username).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Verify password
+    if not verify_password(credentials.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create tokens
+    access_token = create_access_token(data={"sub": user.username})
+    refresh_token = create_refresh_token(data={"sub": user.username})
+    
+    return TokenResponse(
+        access_token=access_token,
+        token_type="bearer",
+        refresh_token=refresh_token
+    )
+
+@router.get("/me", response_model=UserInfo)
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current authenticated user info"""
+    return UserInfo(
+        id=current_user.id,
+        name=current_user.name,
+        username=current_user.username
+    )

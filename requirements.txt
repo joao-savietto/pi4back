@@ -10,3 +10,6 @@ pydantic==2.4.0
 requests==2.31.0
 black==24.1.0
 flake8==6.1.0
+passlib[bcrypt]==1.7.4
+python-jose==1.7.0
+authlib==1.5.1
