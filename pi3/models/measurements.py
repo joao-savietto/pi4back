@@ -1,5 +1,7 @@
-from tortoise import models, fields
 from datetime import datetime
+
+from tortoise import fields, models
+
 
 class Measurement(models.Model):
     id = fields.IntField(pk=True)
