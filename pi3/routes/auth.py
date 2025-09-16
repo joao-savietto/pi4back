@@ -7,7 +7,6 @@ from pi3.auth.dependencies import get_current_user
 from pi3.auth.utils import (
     create_access_token,
     create_refresh_token,
-    get_password_hash,
     verify_password,
 )
 from pi3.models.users import User
@@ -36,30 +35,6 @@ class UserInfo(BaseModel):
     id: int
     name: str
     username: str
-
-
-@router.post("/register", response_model=UserInfo)
-async def register_user(user: UserCreate):
-    """Register a new user"""
-    # Check if user already exists
-    existing_user = await User.filter(username=user.username).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered",
-        )
-
-    # Create new user with hashed password
-    hashed_password = get_password_hash(user.password)
-    db_user = await User.create(
-        name=user.name,
-        username=user.username,
-        hashed_password=hashed_password,
-    )
-
-    return UserInfo(
-        id=db_user.id, name=db_user.name, username=db_user.username
-    )
 
 
 @router.post("/login", response_model=TokenResponse)
