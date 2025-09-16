@@ -14,8 +14,8 @@ WORKDIR /app
 # Copy the project files into the container
 COPY . /app/
 
-# Make the start_fastapi.sh script executable
-RUN chmod +x start_fastapi.sh
+# Make sure start_fastapi.sh is executable (explicitly set permissions)
+RUN chmod +x /app/start_fastapi.sh
 
 # Install MySQL driver and other necessary packages
 RUN apt-get update && apt-get install -y \
@@ -25,6 +25,9 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     default-mysql-client \
     && apt-get clean
+
+# Install Aerich specifically since it's needed for migrations
+RUN pip install aerich
 
 ENV CHROMEDRIVER=/usr/bin/chromedriver
 RUN pip install -r requirements.txt

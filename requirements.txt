@@ -1,5 +1,5 @@
-Tortoise-ORM==0.20.0
-FastAPI==0.109.0
+Tortoise-ORM==0.25.1
+fastapi==0.116.1
 uvicorn[standard]==0.27.0
 mysqlclient==2.2.7
 celery[redis]==5.5.0
@@ -11,5 +11,6 @@ requests==2.31.0
 black==24.1.0
 flake8==6.1.0
 passlib[bcrypt]==1.7.4
-python-jose==1.7.0
+python-jose==3.5.0
 authlib==1.5.1
+aiomysql==0.2.0

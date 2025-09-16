@@ -26,10 +26,32 @@ wait_for_db $MYSQL_HOST $MYSQL_PORT
 
 cd /app
 
-# Run database migrations if needed
+# Run database migrations if needed using Aerich - make sure migrations directory exists
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
-    echo "Running database migrations..."
-    python -m tortoise.orm --config tortoise_config.py migrate
+    echo "Running database migrations with Aerich..."
+    
+    # Check if aerich is available and initialize if needed  
+    if command -v aerich &> /dev/null; then
+        mkdir -p ./migrations
+        
+        # Initialize aerich config using pyproject.toml approach (recommended)
+        if [ ! -f "./pyproject.toml" ]; then
+            echo "Initializing Aerich..."
+            aerich init -t tortoise_config.TORTOISE_ORM
+        fi
+        
+        # Check if db is initialized, if not initialize it first
+        if ! aerich heads &> /dev/null; then
+            echo "Initializing database schema..."
+            aerich init-db
+        fi
+        
+        # Apply migrations
+        echo "Applying database migrations..."
+        aerich upgrade
+    else
+        echo "Aerich not available, skipping migrations"
+    fi
 fi
 
 # Start the FastAPI application

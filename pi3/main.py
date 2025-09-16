@@ -6,13 +6,15 @@ from pi3.routes.users import router as users_router
 import os
 from pi3.models.users import User
 from pi3.auth.utils import get_password_hash
+from tortoise_config import TORTOISE_ORM
+
 
 app = FastAPI(title="FastAPI with Tortoise ORM")
 
 # Register Tortoise ORM
 register_tortoise(
     app,
-    config_file="tortoise_config.py",
+    config=TORTOISE_ORM,
     generate_schemas=False,
     add_exception_handlers=True,
 )
