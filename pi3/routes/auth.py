@@ -8,6 +8,7 @@ from pi3.auth.utils import (
     create_access_token,
     create_refresh_token,
     verify_password,
+    verify_token,
 )
 from pi3.models.users import User
 
@@ -29,6 +30,15 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     refresh_token: Optional[str] = None
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class TokenRefreshResponse(BaseModel):
+    access_token: str
+    token_type: str
 
 
 class UserInfo(BaseModel):
@@ -77,4 +87,25 @@ async def get_current_user_info(
         id=current_user.id,
         name=current_user.name,
         username=current_user.username,
+    )
+
+
+@router.post("/refresh", response_model=TokenRefreshResponse)
+async def refresh_access_token(request: RefreshTokenRequest):
+    """Obtain a new access token using a refresh token"""
+    # Verify the refresh token
+    username = verify_token(request.refresh_token)
+    if username is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Create a new access token for the user
+    new_access_token = create_access_token(data={"sub": username})
+
+    return TokenRefreshResponse(
+        access_token=new_access_token,
+        token_type="bearer",
     )
