@@ -2,6 +2,8 @@
 
 Este projeto é uma API RESTful desenvolvida com FastAPI e Tortoise ORM que permite a coleta de medições de temperatura e umidade provenientes de dispositivos IoT (ESP32). Os dados são armazenados em um banco de dados MySQL para posterior análise e visualização em um dashboard.
 
+Esse projeto faz parte do Projeto Integrador 4 de computação
+
 ## 💡 Funcionalidades Principais
 - 📊 Coleta e armazenamento de medições de temperatura e umidade
 - 🔐 Autenticação segura com JWT (JSON Web Tokens)
