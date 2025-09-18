@@ -24,6 +24,8 @@ echo "MySQL host: $MYSQL_HOST, port: $MYSQL_PORT"
 
 wait_for_db $MYSQL_HOST $MYSQL_PORT
 
+mysql -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" -h "$MYSQL_HOST" --skip-ssl -e "CREATE DATABASE IF NOT EXISTS $MYSQL_DATABASE"
+
 cd /app
 
 # Run database migrations if needed using Aerich - make sure migrations directory exists
