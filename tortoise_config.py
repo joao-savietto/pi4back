@@ -4,9 +4,9 @@ TORTOISE_ORM = {
     "apps": {
         "models": {
             "models": [
-                "pi3.models.users",
-                "pi3.models.measurements",
-                "aerich.models"
+                "pi4.models.users",
+                "pi4.models.measurements",
+                "aerich.models",
             ],
             "default_connection": "default",
         }

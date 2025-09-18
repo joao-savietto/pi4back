@@ -4,8 +4,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 
-from pi3.auth.utils import verify_token
-from pi3.models.users import User
+from pi4.auth.utils import verify_token
+from pi4.models.users import User
 
 # OAuth2 scheme for token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")

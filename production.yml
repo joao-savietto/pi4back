@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ./start_django.sh gunicorn pi3back.wsgi:application --bind 0.0.0.0:8000
+    command: ./start_django.sh gunicorn pi4back.wsgi:application --bind 0.0.0.0:8000
     volumes:
       - .:/app
     ports:

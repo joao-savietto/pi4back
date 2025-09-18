@@ -4,8 +4,8 @@ from typing import List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
-from pi3.models.measurements import Measurement
-from pi3.auth.dependencies import get_current_active_user
+from pi4.models.measurements import Measurement
+from pi4.auth.dependencies import get_current_active_user
 
 router = APIRouter(prefix="/measurements", tags=["measurements"])
 

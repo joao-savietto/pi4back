@@ -10,7 +10,7 @@ Este projeto é uma API RESTful desenvolvida com FastAPI e Tortoise ORM que perm
 
 ## Estrutura do Projeto
 ```
-pi3/
+pi4/
 ├── main.py          # Ponto de entrada da aplicação FastAPI
 ├── routes/          # Rotas da API (endpoints)
 ├── models/          # Modelos de dados para o banco de dados
@@ -38,5 +38,5 @@ pip install -r requirements.txt
 
 ## 4. Executar o projeto no modo local
 ```bash
-uvicorn pi3.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn pi4.main:app --host 0.0.0.0 --port 8000 --reload
 ```

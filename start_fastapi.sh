@@ -57,4 +57,4 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
 fi
 
 # Start the FastAPI application
-exec uvicorn pi3.main:app --host 0.0.0.0 --port 8000 --reload
+exec uvicorn pi4.main:app --host 0.0.0.0 --port 8000 --reload

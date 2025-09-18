@@ -3,9 +3,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from pi3.auth.dependencies import get_current_active_user
-from pi3.auth.utils import get_password_hash
-from pi3.models.users import User
+from pi4.auth.dependencies import get_current_active_user
+from pi4.auth.utils import get_password_hash
+from pi4.models.users import User
 
 router = APIRouter(prefix="/users", tags=["users"])
 

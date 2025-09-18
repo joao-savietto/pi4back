@@ -1,15 +1,15 @@
 from fastapi import FastAPI
 from tortoise.contrib.fastapi import register_tortoise
-from pi3.routes.auth import router as auth_router
-from pi3.routes.measurements import router as measurements_router
-from pi3.routes.users import router as users_router
+from pi4.routes.auth import router as auth_router
+from pi4.routes.measurements import router as measurements_router
+from pi4.routes.users import router as users_router
 import os
-from pi3.models.users import User
-from pi3.auth.utils import get_password_hash
+from pi4.models.users import User
+from pi4.auth.utils import get_password_hash
 from tortoise_config import TORTOISE_ORM
 
 
-app = FastAPI(title="FastAPI with Tortoise ORM")
+app = FastAPI(title="PI4 Backend")
 
 # Register Tortoise ORM
 register_tortoise(
