@@ -9,6 +9,7 @@ class ESP32SensorAPI {
 private:
     String serverUrl;
     String authToken;
+    String refreshToken;
     bool isAuthenticated;
 
 public:
@@ -51,6 +52,12 @@ public:
      * @return Current JWT token or empty string if not authenticated
      */
     String getAuthToken();
+
+    /**
+     * Refresh access token using refresh token
+     * @return True if refresh successful, false otherwise
+     */
+    bool refreshTokenIfNeeded();
 };
 
 #endif // ESP32_SENSOR_API_H
