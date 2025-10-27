@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 from pi4.routes.auth import router as auth_router
@@ -19,7 +19,20 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Access-Control-Allow-Origin"]
 )
+
+
+# Add a custom middleware to ensure CORS headers are always set
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Ensure Access-Control-Allow-Origin header is present in all responses
+    if "access-control-allow-origin" not in [
+        header[0].lower() for header in response.headers.raw
+    ]:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    return response
 
 # Register Tortoise ORM
 register_tortoise(
