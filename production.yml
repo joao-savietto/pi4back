@@ -1,29 +1,34 @@
+version: '3.8'
+
 services:
   web:
+    image: pi4back
     build:
       context: .
       dockerfile: Dockerfile
-    command: ./start_django.sh gunicorn pi4back.wsgi:application --bind 0.0.0.0:8000
-    volumes:
-      - .:/app
+    command: /app/start_fastapi.sh
     ports:
-      - 8000:8000
+      - "8000:8000"
     depends_on:
       - db
     env_file:
       - .env
+    environment:
+      - RUN_MIGRATIONS=true
+      - ENVIRONMENT=production
+      - PRODUCTION=true
 
   db:
-    image: mysql:8.0.36-debian
-    volumes:
-      - db_data:/var/lib/mysql
-      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
-    env_file:
-      - .env
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
-      - 3306:3306
-    command: ["./docker-entrypoint-initdb.d/init-db.sh"]
-    platform: linux/amd64
+      - "3306:3306"
+    volumes:
+      - pi4_mysql_data:/var/lib/mysql      
 
 volumes:
-  db_data:
+  pi4_mysql_data:

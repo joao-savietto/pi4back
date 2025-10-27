@@ -14,8 +14,8 @@ WORKDIR /app
 # Copy the project files into the container
 COPY . /app/
 
-# Make sure start_fastapi.sh is executable (explicitly set permissions)
-RUN chmod +x /app/start_fastapi.sh
+# Make sure scripts are executable
+RUN chmod +x /app/start_fastapi.sh && chmod +x /app/fix_aerich_migrations.sh
 
 # Install MySQL driver and other necessary packages
 RUN apt-get update && apt-get install -y \

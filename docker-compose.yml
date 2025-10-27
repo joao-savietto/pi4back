@@ -18,6 +18,7 @@ services:
     environment:
       - RUN_MIGRATIONS=true
       - ENVIRONMENT=local
+      - PRODUCTION=false
 
   db:
     image: mysql:8.0

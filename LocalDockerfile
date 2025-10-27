@@ -11,8 +11,11 @@ ENV PYTHONUNBUFFERED=1
 # Set the working directory
 WORKDIR /app
 
-# Make sure start_fastapi.sh is executable (explicitly set permissions)
-# RUN chmod +x /app/start_fastapi.sh
+# Copy all necessary files including our new script
+COPY . /app/
+
+# Make sure scripts are executable
+RUN chmod +x /app/start_fastapi.sh && chmod +x /app/fix_aerich_migrations.sh
 
 # Install MySQL driver and other necessary packages
 RUN apt-get update && apt-get install -y \
