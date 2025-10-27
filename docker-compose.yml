@@ -3,10 +3,12 @@ version: '3.8'
 services:
   web:
     image: pi4back
-    build: .
+    build:
+      context: .
+      dockerfile: LocalDockerfile
     command: /app/start_fastapi.sh
     volumes:
-      - .:/app
+      - .:/app:z
     ports:
       - "8000:8000"
     depends_on:

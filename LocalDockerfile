@@ -1,0 +1,33 @@
+FROM python:3.12.11-slim
+
+
+# Expose port 8000
+EXPOSE 8000
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set the working directory
+WORKDIR /app
+
+# Make sure start_fastapi.sh is executable (explicitly set permissions)
+# RUN chmod +x /app/start_fastapi.sh
+
+# Install MySQL driver and other necessary packages
+RUN apt-get update && apt-get install -y \
+    default-libmysqlclient-dev \
+    build-essential \
+    pkg-config \
+    python3-dev \
+    default-mysql-client \
+    && apt-get clean
+
+# Install Aerich specifically since it's needed for migrations
+RUN pip install aerich
+
+# Copy requirements.txt to ensure it's available during build and development
+COPY requirements.txt /app/requirements.txt
+
+ENV CHROMEDRIVER=/usr/bin/chromedriver
+RUN pip install -r /app/requirements.txt
