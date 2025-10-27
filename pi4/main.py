@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 from pi4.routes.auth import router as auth_router
 from pi4.routes.measurements import router as measurements_router
@@ -10,6 +11,15 @@ from tortoise_config import TORTOISE_ORM
 
 
 app = FastAPI(title="PI4 Backend")
+
+# Add CORS middleware to allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Register Tortoise ORM
 register_tortoise(
