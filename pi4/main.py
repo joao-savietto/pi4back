@@ -78,6 +78,11 @@ async def create_default_admin():
                 "DEFAULT_ADMIN_PASSWORD", "password123"
             )
 
+            # Handle potential password length issues for bcrypt hashing
+            if len(default_password) > 72:
+                print("Warning: Password longer than 72 bytes, truncating to first 72 characters")
+                default_password = default_password[:72]
+            
             hashed_password = get_password_hash(default_password)
             await User.create(
                 name="Admin User",
@@ -88,6 +93,8 @@ async def create_default_admin():
             print(f"Created default admin user: {default_username}")
     except Exception as e:
         # Log error but don't crash the application
+        import traceback
+        print(traceback.format_exc())
         print(f"Error creating default admin user: {e}")
 
 
