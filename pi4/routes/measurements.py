@@ -65,11 +65,12 @@ async def get_measurement(
 async def get_measurements(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
+    min_interval_minutes: Optional[int] = Query(None, ge=1),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, le=100, ge=1),
     current_user=Depends(get_current_active_user),
 ):
-    """Get all measurements with optional time period filtering and pagination"""
+    """Get all measurements with optional time period filtering, interval filtering and pagination"""
     query = Measurement.all()
 
     if start_time:
@@ -77,14 +78,31 @@ async def get_measurements(
     if end_time:
         query = query.filter(timestamp__lte=end_time)
 
+    # Get all measurements (ordered by timestamp) to apply interval filtering
+    all_measurements = await query.order_by("timestamp").all()
+    
+    # Apply min_interval_minutes filter if specified
+    if min_interval_minutes is not None and min_interval_minutes > 0:
+        filtered_measurements = []
+        last_timestamp = None
+        
+        for measurement in all_measurements:
+            # If this is the first measurement, or if it's at least
+            # min_interval_minutes after the last one
+            if last_timestamp is None or (measurement.timestamp - last_timestamp).total_seconds() >= min_interval_minutes * 60:
+                filtered_measurements.append(measurement)
+                last_timestamp = measurement.timestamp
+                
+        measurements = filtered_measurements
+    else:
+        measurements = all_measurements
+
     # Get total count for pagination info
-    total = await query.count()
+    total = len(measurements)
     
-    # Apply pagination
+    # Apply pagination to the filtered results
     offset = (page - 1) * page_size
-    measurements_query = query.offset(offset).limit(page_size)
-    
-    measurements = await measurements_query.all()
+    paginated_measurements = measurements[offset:offset + page_size]
 
     return PaginatedMeasurementsResponse(
         measurements=[
@@ -94,7 +112,7 @@ async def get_measurements(
                 humidity=m.humidity,
                 timestamp=m.timestamp,
             )
-            for m in measurements
+            for m in paginated_measurements
         ],
         total=total,
         page=page,
