@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 
 from pi4.models.measurements import Measurement
@@ -18,6 +18,14 @@ class MeasurementCreate(BaseModel):
 class MeasurementResponse(MeasurementCreate):
     id: int
     timestamp: datetime
+
+
+class PaginatedMeasurementsResponse(BaseModel):
+    measurements: List[MeasurementResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 @router.post("/", response_model=MeasurementResponse)
@@ -53,13 +61,15 @@ async def get_measurement(
     )
 
 
-@router.get("/", response_model=List[MeasurementResponse])
+@router.get("/", response_model=PaginatedMeasurementsResponse)
 async def get_measurements(
-    start_time: datetime = None,
-    end_time: datetime = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, le=100, ge=1),
     current_user=Depends(get_current_active_user),
 ):
-    """Get all measurements with optional time period filtering"""
+    """Get all measurements with optional time period filtering and pagination"""
     query = Measurement.all()
 
     if start_time:
@@ -67,14 +77,27 @@ async def get_measurements(
     if end_time:
         query = query.filter(timestamp__lte=end_time)
 
-    measurements = await query.all()
+    # Get total count for pagination info
+    total = await query.count()
+    
+    # Apply pagination
+    offset = (page - 1) * page_size
+    measurements_query = query.offset(offset).limit(page_size)
+    
+    measurements = await measurements_query.all()
 
-    return [
-        MeasurementResponse(
-            id=m.id,
-            temperature=m.temperature,
-            humidity=m.humidity,
-            timestamp=m.timestamp,
-        )
-        for m in measurements
-    ]
+    return PaginatedMeasurementsResponse(
+        measurements=[
+            MeasurementResponse(
+                id=m.id,
+                temperature=m.temperature,
+                humidity=m.humidity,
+                timestamp=m.timestamp,
+            )
+            for m in measurements
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=(total + page_size - 1) // page_size  # Ceiling division
+    )
