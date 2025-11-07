@@ -19,7 +19,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Access-Control-Allow-Origin"]
+    expose_headers=["Access-Control-Allow-Origin"],
 )
 
 
@@ -33,6 +33,7 @@ async def add_cors_headers(request: Request, call_next):
     ]:
         response.headers["Access-Control-Allow-Origin"] = "*"
     return response
+
 
 # Register Tortoise ORM
 register_tortoise(
@@ -80,9 +81,11 @@ async def create_default_admin():
 
             # Handle potential password length issues for bcrypt hashing
             if len(default_password) > 72:
-                print("Warning: Password longer than 72 bytes, truncating to first 72 characters")
+                print(
+                    "Warning: Password longer than 72 bytes, truncating to first 72 characters"
+                )
                 default_password = default_password[:72]
-            
+
             hashed_password = get_password_hash(default_password)
             await User.create(
                 name="Admin User",
@@ -94,6 +97,7 @@ async def create_default_admin():
     except Exception as e:
         # Log error but don't crash the application
         import traceback
+
         print(traceback.format_exc())
         print(f"Error creating default admin user: {e}")
 
