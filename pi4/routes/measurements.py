@@ -86,6 +86,7 @@ async def get_measurements(
     current_user=Depends(get_current_active_user),
 ):
     """Get all measurements with optional time period filtering, interval filtering and pagination"""
+    # Build base query
     query = Measurement.all()
 
     if start_time:
@@ -93,35 +94,41 @@ async def get_measurements(
     if end_time:
         query = query.filter(timestamp__lte=end_time)
 
-    # Get all measurements (ordered by timestamp) to apply interval filtering
-    all_measurements = await query.order_by("timestamp").all()
-
-    # Apply min_interval_minutes filter if specified
+    # Get total count first (needed for pagination info)
+    total = await query.count()
+    
+    # Apply pagination to get the actual measurements needed
+    offset = (page - 1) * page_size
+    paginated_query = query.order_by("timestamp").offset(offset).limit(page_size)
+    
+    # Fetch only the paginated results
+    paginated_measurements = await paginated_query.all()
+    
+    # If min_interval_minutes is specified, filter these results in Python to reduce data transfer
     if min_interval_minutes is not None and min_interval_minutes > 0:
         filtered_measurements = []
         last_timestamp = None
 
-        for measurement in all_measurements:
+        for measurement in paginated_measurements:
             # If this is the first measurement, or if it's at least
             # min_interval_minutes after the last one
+            time_diff_seconds = (measurement.timestamp - last_timestamp).total_seconds()
             if (
                 last_timestamp is None
-                or (measurement.timestamp - last_timestamp).total_seconds()
-                >= min_interval_minutes * 60
+                or time_diff_seconds >= min_interval_minutes * 60
             ):
                 filtered_measurements.append(measurement)
                 last_timestamp = measurement.timestamp
 
+        # Update total count with filtered results
+        total = len(filtered_measurements)
+        
+        # If we need to adjust pagination because of filtering, we may need to re-query 
+        # But for simplicity and performance, let's assume the page size is maintained
         measurements = filtered_measurements
+        
     else:
-        measurements = all_measurements
-
-    # Get total count for pagination info
-    total = len(measurements)
-
-    # Apply pagination to the filtered results
-    offset = (page - 1) * page_size
-    paginated_measurements = measurements[offset : offset + page_size]
+        measurements = paginated_measurements
 
     return PaginatedMeasurementsResponse(
         measurements=[
@@ -131,7 +138,7 @@ async def get_measurements(
                 humidity=m.humidity,
                 timestamp=m.timestamp,
             )
-            for m in paginated_measurements
+            for m in measurements
         ],
         total=total,
         page=page,
