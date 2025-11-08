@@ -112,10 +112,10 @@ async def get_measurements(
         for measurement in paginated_measurements:
             # If this is the first measurement, or if it's at least
             # min_interval_minutes after the last one
-            time_diff_seconds = (measurement.timestamp - last_timestamp).total_seconds()
             if (
                 last_timestamp is None
-                or time_diff_seconds >= min_interval_minutes * 60
+                or (measurement.timestamp - last_timestamp).total_seconds()
+                >= min_interval_minutes * 60
             ):
                 filtered_measurements.append(measurement)
                 last_timestamp = measurement.timestamp
