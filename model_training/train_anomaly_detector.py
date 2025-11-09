@@ -13,26 +13,90 @@ from tensorflow.keras.layers import LSTM, Dense, RepeatVector, TimeDistributed
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 import json
+import os
+import requests as re
+import logging
+
+# Configure GPU usage
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Use GPU ID 0 (strongest one)
+import tensorflow as tf
+
+# Suppress specific TensorFlow warnings that are not actionable
+tf.get_logger().setLevel("ERROR")
+
+# Also suppress the specific autotuning warning
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
+# Configure TensorFlow to use GPU memory growth
+gpus = tf.config.experimental.list_physical_devices("GPU")
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print(
+            f"Using GPU: {tf.config.experimental.get_device_details(gpus[0])}"
+        )
+    except RuntimeError as e:
+        print(f"GPU configuration error: {e}")
 
 # API Configuration
 API_BASE_URL = "https://esp.savietto.app"
-ACCESS_TOKEN = (
-    "YOUR_ACCESS_TOKEN_HERE"  # Set this to your actual access token
-)
+
+
+def login(user, password):
+    """Login to the API and get an access token"""
+    headers = {"Content-Type": "application/json"}
+    data = {"username": user, "password": password}
+
+    response = re.post(
+        f"{API_BASE_URL}/auth/login", json=data, headers=headers
+    )
+    if response.status_code == 200:
+        return response.json()
+    print(response.text)
+    return None
+
+USERNAME = "superadmin"
+PASSWORD = "supersecret"
+
+ACCESS_TOKEN = None
 
 # Model parameters
-SEQUENCE_LENGTH = 50
+SEQUENCE_LENGTH = 288 * 2  # last 2 days
 TRAIN_TEST_SPLIT = 0.8
 EPOCHS = 100
 BATCH_SIZE = 32
+MIN_INTERVAL_MINUTES = (
+    5  # Configurable parameter for minimum interval between readings
+)
+PAGE_SIZE = 100
+
+
+def load_data_from_csv():
+    """Load measurements from CSV if available"""
+    csv_file = "measurements.csv"
+    if os.path.exists(csv_file):
+        print("Loading data from CSV...")
+        df = pd.read_csv(csv_file)
+        # Convert timestamp column to datetime
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        return df.to_dict("records")
+    return None
 
 
 async def fetch_measurements(session, page=1):
     """Fetch measurements from the API with pagination"""
-    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
+    global ACCESS_TOKEN
+    if not ACCESS_TOKEN:
+        tokens = login(USERNAME, PASSWORD)
+        ACCESS_TOKEN = tokens["access_token"]        
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json",
+    }
 
     async with session.get(
-        f"{API_BASE_URL}/api/measurements/?page={page}&page_size=100",
+        f"{API_BASE_URL}/measurements/?page={page}&page_size={PAGE_SIZE}&min_interval_minutes={MIN_INTERVAL_MINUTES}",
         headers=headers,
     ) as response:
         if response.status == 200:
@@ -97,19 +161,23 @@ def build_lstm_autoencoder(sequence_length, n_features):
         [
             LSTM(
                 64,
-                activation="relu",
+                activation="tanh",
                 input_shape=(sequence_length, n_features),
                 return_sequences=True,
+                dropout=0.2,
+                recurrent_dropout=0.2,
             ),
-            LSTM(32, activation="relu", return_sequences=False),
+            LSTM(32, activation="tanh", return_sequences=False, dropout=0.2, recurrent_dropout=0.2),
             RepeatVector(sequence_length),
-            LSTM(32, activation="relu", return_sequences=True),
-            LSTM(64, activation="relu", return_sequences=True),
+            LSTM(32, activation="tanh", return_sequences=True, dropout=0.2, recurrent_dropout=0.2),
+            LSTM(64, activation="tanh", return_sequences=True, dropout=0.2, recurrent_dropout=0.2),
             TimeDistributed(Dense(n_features)),
         ]
     )
 
-    model.compile(optimizer=Adam(learning_rate=0.001), loss="mse")
+    # Use Adam with gradient clipping to prevent exploding gradients
+    optimizer = Adam(learning_rate=0.001, clipnorm=1.0)
+    model.compile(optimizer=optimizer, loss="mse")
     return model
 
 
@@ -117,9 +185,21 @@ async def main():
     """Main training function"""
     print("Starting anomaly detection model training...")
 
-    # 1. Fetch data from API
-    print("Fetching measurements from API...")
-    measurements = await fetch_all_measurements()
+    # Check if we have cached CSV data first
+    csv_data = load_data_from_csv()
+    if csv_data is not None:
+        print("Using cached data from CSV...")
+        measurements = csv_data
+    else:
+        # 1. Fetch data from API
+        print("Fetching measurements from API...")
+        measurements = await fetch_all_measurements()
+
+        # Save to CSV for future use
+        if measurements:
+            df = pd.DataFrame(measurements)
+            df.to_csv("measurements.csv", index=False)
+            print("Data saved to measurements.csv")
 
     if not measurements:
         print("No measurements found!")
@@ -174,10 +254,31 @@ async def main():
     mse = np.mean(np.power(X_test - predictions, 2), axis=(1, 2))
     threshold = np.percentile(mse, 95)  # Use 95th percentile as threshold
 
-    print(f"Reconstruction error threshold: {threshold}")
+    # Calculate additional quality metrics
+    mean_mse = np.mean(mse)
+    std_mse = np.std(mse)
+    max_mse = np.max(mse)
+    min_mse = np.min(mse)
+
+    print("Reconstruction error statistics:")
+    print(f"  Mean MSE: {mean_mse:.8f}")
+    print(f"  Std MSE: {std_mse:.8f}")
+    print(f"  Min MSE: {min_mse:.8f}")
+    print(f"  Max MSE: {max_mse:.8f}")
+    print(f"Reconstruction error threshold (95th percentile): {threshold}")
+
+    # Analyze model performance
+    anomalies = mse > threshold
+    num_anomalies = np.sum(anomalies)
+    anomaly_rate = num_anomalies / len(mse) * 100
+
+    print("\nModel Quality Assessment:")
+    print(f"  Total test samples: {len(mse)}")
+    print(f"  Detected anomalies: {num_anomalies}")
+    print(f"  Anomaly rate: {anomaly_rate:.2f}%")
 
     # 5. Save model and scaler
-    model.save("anomaly_detector_model.h5")
+    model.save("anomaly_detector_model.keras")
     with open("scaler.json", "w") as f:
         json.dump(scaler.data_range_.tolist(), f)
         json.dump(scaler.data_min_.tolist(), f)

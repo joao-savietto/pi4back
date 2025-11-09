@@ -97,7 +97,7 @@ async def get_measurements(
     # For interval filtering to work properly across pages,
     # we need to get all measurements first, then filter and paginate
     all_measurements = await query.order_by("timestamp").all()
-    
+
     # Apply min_interval_minutes filter if specified
     if min_interval_minutes is not None and min_interval_minutes > 0:
         filtered_measurements = []
@@ -117,13 +117,13 @@ async def get_measurements(
         measurements = filtered_measurements
     else:
         measurements = all_measurements
-    
-    # Get total count for pagination info  
+
+    # Get total count for pagination info
     total = len(measurements)
 
     # Apply pagination to the already filtered results
     offset = (page - 1) * page_size
-    paginated_measurements = measurements[offset:offset + page_size]
+    paginated_measurements = measurements[offset : offset + page_size]
 
     return PaginatedMeasurementsResponse(
         measurements=[

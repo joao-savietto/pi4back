@@ -4,6 +4,7 @@ from tortoise.contrib.fastapi import register_tortoise
 from pi4.routes.auth import router as auth_router
 from pi4.routes.measurements import router as measurements_router
 from pi4.routes.users import router as users_router
+from pi4.routes.anomaly import router as anomaly_router
 import os
 from pi4.models.users import User
 from pi4.auth.utils import get_password_hash
@@ -106,6 +107,7 @@ async def create_default_admin():
 app.include_router(measurements_router)
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(anomaly_router)
 
 
 @app.on_event("startup")
