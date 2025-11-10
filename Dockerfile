@@ -15,7 +15,7 @@ WORKDIR /app
 COPY . /app/
 
 # Make sure scripts are executable
-RUN chmod +x /app/start_fastapi.sh && chmod +x /app/fix_aerich_migrations.sh
+RUN chmod +x /app/start_fastapi.sh
 
 # Install MySQL driver and other necessary packages
 RUN apt-get update && apt-get install -y \

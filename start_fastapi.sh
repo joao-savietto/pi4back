@@ -32,8 +32,6 @@ cd /app
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Running database migrations with Aerich..."
     
-    # Use our new fix script to handle migration format issues
-    ./fix_aerich_migrations.sh
 fi
 
 # Start the FastAPI application
