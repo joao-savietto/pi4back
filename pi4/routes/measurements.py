@@ -7,6 +7,9 @@ from pydantic import BaseModel
 from pi4.models.measurements import Measurement
 from pi4.auth.dependencies import get_current_active_user
 from tortoise import fields
+from tortoise.functions import Min, Max, Avg
+
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/measurements", tags=["measurements"])
 
@@ -41,6 +44,70 @@ class PaginatedMeasurementsResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+@router.get("/statistics", response_model=MeasurementStatisticsResponse)
+async def get_statistics(
+    start_time: datetime,
+    end_time: datetime,
+    current_user=Depends(get_current_active_user),
+):
+    """Get statistics for measurements within a time range"""
+    # Validate that start_time is before end_time
+    # ⏰ Garantindo timezone UTC nas datas
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+    if end_time.tzinfo is None:
+        end_time = end_time.replace(tzinfo=timezone.utc)
+
+    if start_time >= end_time:
+        raise HTTPException(
+            status_code=400, detail="start_time must be before end_time"
+        )
+
+    query = Measurement.filter(
+        timestamp__gte=start_time, timestamp__lte=end_time
+    )
+    count = await query.count()
+
+    if count == 0:
+        # Return zeros for all stats if no data found
+        return MeasurementStatisticsResponse(
+            count=0,
+            temperature_min=0.0,
+            temperature_max=0.0,
+            temperature_avg=0.0,
+            humidity_min=0.0,
+            humidity_max=0.0,
+            humidity_avg=0.0,
+            earliest_timestamp=start_time,
+            latest_timestamp=end_time,
+        )
+
+    # Use aggregation functions to get min, max, and avg values
+    stats = await query.annotate(
+        temperature_min=Min("temperature"),
+        temperature_max=Max("temperature"),
+        temperature_avg=Avg("temperature"),
+        humidity_min=Min("humidity"),
+        humidity_max=Max("humidity"),
+        humidity_avg=Avg("humidity"),
+        earliest_timestamp=Min("timestamp"),
+        latest_timestamp=Max("timestamp"),
+    ).first()
+
+    # Return the statistics
+    return MeasurementStatisticsResponse(
+        count=count,
+        temperature_min=stats.temperature_min or 0.0,
+        temperature_max=stats.temperature_max or 0.0,
+        temperature_avg=stats.temperature_avg or 0.0,
+        humidity_min=stats.humidity_min or 0.0,
+        humidity_max=stats.humidity_max or 0.0,
+        humidity_avg=stats.humidity_avg or 0.0,
+        earliest_timestamp=stats.earliest_timestamp or start_time,
+        latest_timestamp=stats.latest_timestamp or end_time,
+    )
 
 
 @router.post("/", response_model=MeasurementResponse)
@@ -139,65 +206,4 @@ async def get_measurements(
         page=page,
         page_size=page_size,
         total_pages=(total + page_size - 1) // page_size,  # Ceiling division
-    )
-
-
-@router.get("/statistics", response_model=MeasurementStatisticsResponse)
-async def get_statistics(
-    start_time: datetime,
-    end_time: datetime,
-    current_user=Depends(get_current_active_user),
-):
-    """Get statistics for measurements within a time range"""
-    # Validate that start_time is before end_time
-    if start_time >= end_time:
-        raise HTTPException(
-            status_code=400, detail="start_time must be before end_time"
-        )
-
-    # Query measurements in the specified time range
-    query = Measurement.filter(
-        timestamp__gte=start_time, timestamp__lte=end_time
-    )
-
-    # Get count of measurements
-    count = await query.count()
-
-    if count == 0:
-        # Return zeros for all stats if no data found
-        return MeasurementStatisticsResponse(
-            count=0,
-            temperature_min=0.0,
-            temperature_max=0.0,
-            temperature_avg=0.0,
-            humidity_min=0.0,
-            humidity_max=0.0,
-            humidity_avg=0.0,
-            earliest_timestamp=start_time,
-            latest_timestamp=end_time,
-        )
-
-    # Use aggregation functions to get min, max, and avg values
-    stats = await query.annotate(
-        temperature_min=fields.Min("temperature"),
-        temperature_max=fields.Max("temperature"),
-        temperature_avg=fields.Avg("temperature"),
-        humidity_min=fields.Min("humidity"),
-        humidity_max=fields.Max("humidity"),
-        humidity_avg=fields.Avg("humidity"),
-        earliest_timestamp=fields.Min("timestamp"),
-        latest_timestamp=fields.Max("timestamp"),
-    ).first()
-
-    # Return the statistics
-    return MeasurementStatisticsResponse(
-        count=count,
-        temperature_min=stats.temperature_min or 0.0,
-        temperature_max=stats.temperature_max or 0.0,
-        temperature_avg=stats.temperature_avg or 0.0,
-        humidity_min=stats.humidity_min or 0.0,
-        humidity_max=stats.humidity_max or 0.0,
-        humidity_avg=stats.humidity_avg or 0.0,
-        earliest_timestamp=stats.earliest_timestamp or start_time,
-        latest_timestamp=stats.latest_timestamp or end_time,
     )

@@ -56,16 +56,17 @@ def login(user, password):
     print(response.text)
     return None
 
-USERNAME = "superadmin"
-PASSWORD = "supersecret"
+
+USERNAME = ""
+PASSWORD = ""
 
 ACCESS_TOKEN = None
 
 # Model parameters
 SEQUENCE_LENGTH = 288 * 2  # last 2 days
 TRAIN_TEST_SPLIT = 0.8
-EPOCHS = 100
-BATCH_SIZE = 32
+EPOCHS = 50
+BATCH_SIZE = 64
 MIN_INTERVAL_MINUTES = (
     5  # Configurable parameter for minimum interval between readings
 )
@@ -89,7 +90,7 @@ async def fetch_measurements(session, page=1):
     global ACCESS_TOKEN
     if not ACCESS_TOKEN:
         tokens = login(USERNAME, PASSWORD)
-        ACCESS_TOKEN = tokens["access_token"]        
+        ACCESS_TOKEN = tokens["access_token"]
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json",
@@ -167,10 +168,28 @@ def build_lstm_autoencoder(sequence_length, n_features):
                 dropout=0.2,
                 recurrent_dropout=0.2,
             ),
-            LSTM(32, activation="tanh", return_sequences=False, dropout=0.2, recurrent_dropout=0.2),
+            LSTM(
+                32,
+                activation="tanh",
+                return_sequences=False,
+                dropout=0.2,
+                recurrent_dropout=0.2,
+            ),
             RepeatVector(sequence_length),
-            LSTM(32, activation="tanh", return_sequences=True, dropout=0.2, recurrent_dropout=0.2),
-            LSTM(64, activation="tanh", return_sequences=True, dropout=0.2, recurrent_dropout=0.2),
+            LSTM(
+                32,
+                activation="tanh",
+                return_sequences=True,
+                dropout=0.2,
+                recurrent_dropout=0.2,
+            ),
+            LSTM(
+                64,
+                activation="tanh",
+                return_sequences=True,
+                dropout=0.2,
+                recurrent_dropout=0.2,
+            ),
             TimeDistributed(Dense(n_features)),
         ]
     )
@@ -232,9 +251,9 @@ async def main():
     print("Building LSTM Autoencoder...")
     model = build_lstm_autoencoder(SEQUENCE_LENGTH, scaled_data.shape[1])
 
-    # Early stopping callback
+    # Early stopping callback with better parameters to prevent overfitting
     early_stopping = EarlyStopping(
-        monitor="loss", patience=10, restore_best_weights=True
+        monitor="val_loss", patience=15, restore_best_weights=True, verbose=1
     )
 
     print("Training model...")

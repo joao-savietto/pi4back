@@ -42,7 +42,7 @@ async def detect_anomaly(
 
     try:
         # Perform the anomaly detection using the service
-        result = anomaly_service.predict_anomaly(
+        result = await anomaly_service.predict_anomaly(
             measurement.temperature, measurement.humidity
         )
 
@@ -78,7 +78,7 @@ async def detect_anomaly_batch(
     results = []
     for measurement in measurements:
         try:
-            result = anomaly_service.predict_anomaly(
+            result = await anomaly_service.predict_anomaly(
                 measurement.temperature, measurement.humidity
             )
             message = "Anomalous" if result["is_anomalous"] else "Normal"
