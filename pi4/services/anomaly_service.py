@@ -11,7 +11,11 @@ from pi4.models.measurements import Measurement
 
 
 class AnomalyDetectionService:
-    """Service class for anomaly detection functionality"""
+    """Service class for anomaly detection functionality.
+    
+    Note: This service fetches measurements with 5-minute intervals to match
+    the training data pattern used for the LSTM autoencoder model.
+    """
 
     def __init__(self):
         self.model: Optional[Any] = None
@@ -97,15 +101,43 @@ class AnomalyDetectionService:
         return scaled_data
 
     async def _fetch_recent_measurements(self, count: int) -> List[tuple]:
-        """Fetch recent measurements from database for sequence creation"""
+        """Fetch recent measurements from database for sequence creation with 5-minute intervals"""
         try:
-            # Fetch measurements ordered by timestamp (oldest first)
-            measurements = await Measurement.order_by("timestamp").limit(
-                count
+            # Fetch more measurements than needed to account for interval filtering
+            # We fetch 3x more to ensure we have enough after filtering
+            fetch_count = count * 3
+            all_measurements = await Measurement.all().order_by("-timestamp").limit(
+                fetch_count
             ).all()
             
-            # Convert to list of tuples (temperature, humidity)
-            return [(m.temperature, m.humidity) for m in measurements]
+            # Apply 5-minute interval filtering (same logic as in measurements route)
+            # Process in reverse order (newest first) then reverse back
+            if all_measurements:
+                filtered_measurements = []
+                last_timestamp = None
+
+                # Process from newest to oldest for interval filtering
+                for measurement in all_measurements:
+                    # If this is the first measurement, or if it's at least
+                    # 5 minutes (300 seconds) after the last one
+                    if (
+                        last_timestamp is None
+                        or (measurement.timestamp - last_timestamp).total_seconds()
+                        >= 300  # 5 minutes = 300 seconds
+                    ):
+                        filtered_measurements.append(measurement)
+                        last_timestamp = measurement.timestamp
+
+                # Reverse to get chronological order (oldest first)
+                filtered_measurements.reverse()
+                
+                # Take the most recent measurements after filtering
+                filtered_measurements = filtered_measurements[-count:] if len(filtered_measurements) > count else filtered_measurements
+                
+                # Convert to list of tuples (temperature, humidity)
+                return [(m.temperature, m.humidity) for m in filtered_measurements]
+            else:
+                return []
         except Exception as e:
             print(f"Error fetching recent measurements: {e}")
             # Return empty list if there's an error
@@ -122,38 +154,44 @@ class AnomalyDetectionService:
         sequence_length = 288 * 2  # Same as used during training (2 days)
         n_features = 2  # temperature and humidity
 
-        # Preprocess the current measurement
-        current_scaled = self.preprocess_single_measurement(
-            temperature, humidity
-        )
-
+        # Build the sequence data - we need exactly sequence_length measurements
+        sequence_data = []
+        
         # If we don't have enough historical data, pad with oldest ones
         if len(historical_measurements) < sequence_length - 1:
             # Not enough historical data yet - pad with repeated oldest measurements  
             # This is a simplified approach; in production you might want to handle this differently
-            sequence_data = [
-                (
-                    historical_measurements[0][0]
-                    if historical_measurements
-                    else current_scaled[0]
-                )
-            ] * (sequence_length - 1)
+            if historical_measurements:
+                # Use the oldest measurement for padding
+                oldest_temp, oldest_hum = historical_measurements[0]
+                oldest_scaled = self.preprocess_single_measurement(oldest_temp, oldest_hum)[0]
+                # Pad with oldest measurements
+                padding_count = sequence_length - 1 - len(historical_measurements)
+                sequence_data.extend([oldest_scaled] * padding_count)
+                # Add all historical measurements
+                for temp, hum in historical_measurements:
+                    scaled = self.preprocess_single_measurement(temp, hum)[0]
+                    sequence_data.append(scaled)
+            else:
+                # No historical data - use current measurement for all
+                current_scaled = self.preprocess_single_measurement(temperature, humidity)[0]
+                sequence_data = [current_scaled] * (sequence_length - 1)
         else:
-            # Use the most recent measurements available
-            recent_scaled = []
-            for temp, hum in historical_measurements[
-                -(sequence_length - 1) :
-            ]:
-                scaled = self.preprocess_single_measurement(temp, hum)
-                recent_scaled.append(scaled[0])
+            # Use the most recent measurements available (last sequence_length-1 measurements)
+            for temp, hum in historical_measurements[-(sequence_length - 1):]:
+                scaled = self.preprocess_single_measurement(temp, hum)[0]
+                sequence_data.append(scaled)
 
-            sequence_data = recent_scaled
+        # Preprocess and append current measurement at the end
+        current_scaled = self.preprocess_single_measurement(temperature, humidity)[0]
+        sequence_data.append(current_scaled)
 
-        # Append current measurement at the end
-        sequence_data.append(current_scaled[0])
+        # Ensure we have exactly sequence_length elements
+        if len(sequence_data) != sequence_length:
+            raise ValueError(f"Sequence length mismatch: expected {sequence_length}, got {len(sequence_data)}")
 
         # Convert to numpy array and reshape for model input [samples, time_steps, features]
-        sequence = np.array(sequence_data)
+        sequence = np.array(sequence_data, dtype=np.float32)
         sequence = sequence.reshape(1, sequence_length, n_features)
 
         return sequence
