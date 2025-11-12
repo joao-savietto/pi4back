@@ -63,7 +63,7 @@ PASSWORD = ""
 ACCESS_TOKEN = None
 
 # Model parameters
-SEQUENCE_LENGTH = 288 * 2  # last 2 days
+SEQUENCE_LENGTH = 72 # 6 hours
 TRAIN_TEST_SPLIT = 0.8
 EPOCHS = 50
 BATCH_SIZE = 64

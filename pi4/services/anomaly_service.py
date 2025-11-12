@@ -87,7 +87,7 @@ class AnomalyDetectionService:
             # Load threshold value from the training output
             # We'll hardcode a reasonable default for now, but ideally this should be stored separately
             self.threshold_value = (
-                0.0009264747565845443  # From previous training run
+                0.0024242943115000025  # From previous training run
             )
             print("Model and scaler loaded")
             return True
@@ -161,8 +161,8 @@ class AnomalyDetectionService:
         historical_measurements: List[tuple],
     ) -> np.ndarray:
         """Create proper sequence with historical measurements for prediction"""
-        # Create a complete sequence of 576 measurements (2 days worth)
-        sequence_length = 288 * 2  # Same as used during training (2 days)
+        # Create a complete sequence of 72 measurements (6 hours)
+        sequence_length = 72  # Same as used during training (2 days)
         n_features = 2  # temperature and humidity
 
         # Build the sequence data - we need exactly sequence_length measurements
@@ -320,8 +320,8 @@ class AnomalyDetectionService:
         """Predict if a measurement is anomalous with detailed diagnostics"""
         try:
             # Fetch the required number of historical measurements from database
-            # We need 575 previous measurements plus current one = 576 total
-            sequence_length = 288 * 2  # Same as used during training (2 days)
+            # We need 575 previous measurements plus current one = 72 total
+            sequence_length = 72  # Same as used during training (6 hours)
             
             # Get exactly the amount needed for sequence creation 
             historical_measurements = await self._fetch_recent_measurements(sequence_length - 1)
