@@ -1,4 +1,4 @@
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Dict, Tuple
 import numpy as np
 from tensorflow.keras.models import load_model
 from sklearn.preprocessing import MinMaxScaler
@@ -21,6 +21,7 @@ class AnomalyDetectionService:
         self.model: Optional[Any] = None
         self.scaler: Optional[MinMaxScaler] = None
         self.threshold_value: Optional[float] = None
+        self.dataset_stats: Dict[str, any] = {}
 
     def load_model(self) -> bool:
         """Load the trained anomaly detection model and related components"""
@@ -72,6 +73,16 @@ class AnomalyDetectionService:
                 scaler_data_range + 1e-8
             )  # Avoid division by zero
             self.scaler.min_ = -scaler_data_min * self.scaler.scale_
+
+            # Load dataset statistics if available (for better diagnostics)
+            stats_path = "dataset_analysis.json"
+            if os.path.exists(stats_path):
+                with open(stats_path, 'r') as f:
+                    try:
+                        self.dataset_stats = json.load(f)
+                    except Exception as e:
+                        print(f"Warning: Could not load dataset statistics: {e}")
+                        self.dataset_stats = {}
 
             # Load threshold value from the training output
             # We'll hardcode a reasonable default for now, but ideally this should be stored separately
@@ -196,8 +207,117 @@ class AnomalyDetectionService:
 
         return sequence
 
+    def _classify_anomaly_type(self, temperature: float, humidity: float) -> Dict[str, any]:
+        """Classify the type of anomaly based on statistical analysis"""
+        if not self.dataset_stats:
+            # Return default classification if no stats available
+            return {
+                "type": "unknown",
+                "confidence": 0.0,
+                "details": "Statistical analysis unavailable"
+            }
+        
+        temp_stats = self.dataset_stats.get('statistics', {}).get('temperature', {})
+        hum_stats = self.dataset_stats.get('statistics', {}).get('humidity', {})
+        
+        # Get normal ranges
+        normal_temp = self.dataset_stats.get('normal_ranges', {}).get('temperature', {})
+        normal_hum = self.dataset_stats.get('normal_ranges', {}).get('humidity', {})
+        
+        temp_mean = temp_stats.get('mean', 0)
+        temp_std = temp_stats.get('std', 1)
+        hum_mean = hum_stats.get('mean', 0) 
+        hum_std = hum_stats.get('std', 1)
+        
+        # Calculate how many standard deviations away from normal
+        temp_deviation = abs(temperature - temp_mean) / (temp_std + 1e-8) if temp_std != 0 else 0
+        hum_deviation = abs(humidity - hum_mean) / (hum_std + 1e-8) if hum_std != 0 else 0
+        
+        # Classify anomaly based on deviation and ranges
+        anomaly_type = "normal"
+        confidence = 0.0
+        
+        # Determine the most significant deviation
+        if temperature > normal_temp.get('normal_max', temp_mean + 2*temp_std):
+            anomaly_type = "high_temperature"
+            confidence = min(temp_deviation / 2, 1.0)
+        elif temperature < normal_temp.get('normal_min', temp_mean - 2*temp_std):
+            anomaly_type = "low_temperature" 
+            confidence = min(temp_deviation / 2, 1.0)
+        elif humidity > normal_hum.get('normal_max', hum_mean + 2*hum_std):
+            anomaly_type = "high_humidity"
+            confidence = min(hum_deviation / 2, 1.0)
+        elif humidity < normal_hum.get('normal_min', hum_mean - 2*hum_std):
+            anomaly_type = "low_humidity"
+            confidence = min(hum_deviation / 2, 1.0)
+        else:
+            # Check if it's an unusual combination
+            temp_normal_range = [temp_mean - 2*temp_std, temp_mean + 2*temp_std]
+            hum_normal_range = [hum_mean - 2*hum_std, hum_mean + 2*hum_std]
+            
+            if (temperature > temp_normal_range[1] and humidity < hum_normal_range[0]) or \
+               (temperature < temp_normal_range[0] and humidity > hum_normal_range[1]):
+                anomaly_type = "unusual_combination"
+                confidence = min((temp_deviation + hum_deviation) / 4, 1.0)
+        
+        # Add more detailed information
+        details = {
+            'temperature': {
+                'value': temperature,
+                'normal_min': normal_temp.get('normal_min', temp_mean - 2*temp_std),
+                'normal_max': normal_temp.get('normal_max', temp_mean + 2*temp_std),
+                'deviation_from_mean': (temperature - temp_mean) / (temp_std + 1e-8)
+            },
+            'humidity': {
+                'value': humidity,
+                'normal_min': normal_hum.get('normal_min', hum_mean - 2*hum_std),
+                'normal_max': normal_hum.get('normal_max', hum_mean + 2*hum_std),
+                'deviation_from_mean': (humidity - hum_mean) / (hum_std + 1e-8)
+            }
+        }
+        
+        return {
+            "type": anomaly_type,
+            "confidence": float(confidence),
+            "details": details
+        }
+
+    def _analyze_anomaly_detailed(self, temperature: float, humidity: float, mse: float) -> Dict[str, any]:
+        """Provide detailed analysis of the detected anomaly"""
+        
+        # Get basic classification
+        classification = self._classify_anomaly_type(temperature, humidity)
+        
+        # Analyze reconstruction error in detail
+        error_details = {
+            "reconstruction_error": float(mse),
+            "threshold": float(self.threshold_value),
+            "error_ratio_to_threshold": mse / (self.threshold_value + 1e-8),
+            "is_significantly_anomalous": bool(mse > self.threshold_value * 2)  # Significantly anomalous
+        }
+        
+        # Get additional statistical context
+        temp_stats = self.dataset_stats.get('statistics', {}).get('temperature', {})
+        hum_stats = self.dataset_stats.get('statistics', {}).get('humidity', {})
+        
+        return {
+            "classification": classification,
+            "error_analysis": error_details,
+            "dataset_context": {
+                "total_measurements": self.dataset_stats.get('dataset_info', {}).get('total_measurements', 0),
+                "temperature_range": {
+                    "min": temp_stats.get('min', None),
+                    "max": temp_stats.get('max', None)
+                },
+                "humidity_range": {
+                    "min": hum_stats.get('min', None),
+                    "max": hum_stats.get('max', None)
+                }
+            }
+        }
+
     async def predict_anomaly(self, temperature: float, humidity: float):
-        """Predict if a measurement is anomalous"""
+        """Predict if a measurement is anomalous with detailed diagnostics"""
         try:
             # Fetch the required number of historical measurements from database
             # We need 575 previous measurements plus current one = 576 total
@@ -219,12 +339,19 @@ class AnomalyDetectionService:
 
             # Check if it's anomalous
             is_anomalous = bool(mse > self.threshold_value)
-
-            return {
+            
+            result = {
                 "is_anomalous": is_anomalous,
                 "reconstruction_error": float(mse),
                 "threshold": float(self.threshold_value),
             }
+            
+            # If anomalous, add detailed diagnostics
+            if is_anomalous:
+                diagnosis = self._analyze_anomaly_detailed(temperature, humidity, mse)
+                result["diagnosis"] = diagnosis
+
+            return result
 
         except Exception as e:
             raise HTTPException(
