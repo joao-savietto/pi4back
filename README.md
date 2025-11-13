@@ -1,8 +1,7 @@
-# 🚀 Projeto de Coleta de Dados IoT
+# 🔬 Projeto Integrador 4 da Univesp (Universidade Virtual do Estado de São Paulo)
+🚀 Um dashboard moderno para monitorar dados de sensores, como temperatura e umidade, com autenticação segura e visualizações em tempo real.
 
-Este projeto é uma API RESTful desenvolvida com FastAPI e Tortoise ORM que permite a coleta de medições de temperatura e umidade provenientes de dispositivos IoT (ESP32). Os dados são armazenados em um banco de dados MySQL para posterior análise e visualização em um dashboard.
-
-Esse projeto faz parte do Projeto Integrador 4 de computação
+Este projeto é uma API RESTful desenvolvida com FastAPI e Tortoise ORM que permite a coleta de medições de temperatura e umidade provenientes de dispositivos IoT (ESP32). Os dados são armazenados em um banco de dados MySQL para posterior análise e visualização em um dashboard. O sistema inclui um avançado mecanismo de detecção de anomalias usando aprendizado de máquina.
 
 ## 💡 Funcionalidades Principais
 - 📊 Coleta e armazenamento de medições de temperatura e umidade
@@ -11,6 +10,9 @@ Esse projeto faz parte do Projeto Integrador 4 de computação
 - 📱 Integração com dispositivos ESP32 via HTTP
 - 🛢️ Armazenamento persistente em MySQL usando Tortoise ORM
 - 🌐 API RESTful completa para acesso aos dados
+- 🔍 **Detecção de Anomalias com Machine Learning** - Modelo LSTM Autoencoder treinado para identificar padrões anômalos nos sensores
+- ⚙️ Migracões automáticas do banco de dados via Aerich
+- 🐳 Configurações de deploy otimizadas (LocalDockerfile e docker-compose.yml)
 
 ## 📁 Estrutura do Projeto
 ```
@@ -116,7 +118,7 @@ void setup() {
 }
 
 void loop() {
-    // Leitura dos sensores
+    // Leitura dos sensores (substitua por código real)
     float temperatura = readTemperature();
     float umidade = readHumidity();
     
@@ -129,13 +131,56 @@ void loop() {
 }
 ```
 
-## 🔧 Desenvolvimento
+### Configuração do ESP32:
+1. Substitua os valores em `ESP32SensorExample.ino`:
+   - `ssid` e `password`: Suas credenciais de WiFi
+   - `serverUrl`: Endereço IP do servidor (ex: http://192.168.1.100:8000)
+   - `username` e `password`: Credenciais do admin do sistema
+
+## 🌟 Recursos Avançados
+
+### 🔍 Detecção de Anomalias com Machine Learning
+Este projeto implementa um sistema avançado de detecção de anomalias usando uma rede neural LSTM Autoencoder treinada em dados históricos dos sensores.
+
+#### Funcionalidades:
+- Modelo treinado com 72 passos temporais (6 horas)
+- Cálculo automático do limiar de erro de reconstrução
+- Métricas de desempenho detalhadas no console
+
+#### Como usar:
+```bash
+# Treinar um novo modelo (ou reutilizar o existente)
+python model_training/train_anomaly_detector.py
+```
+
+O script irá:
+1. Buscar medições históricas da API
+2. Preprocessar dados com MinMaxScaler
+3. Treinar o modelo LSTM Autoencoder com early stopping
+4. Salvar o modelo em `anomaly_detector_model.keras`
+5. Calcular o limiar ótimo de erro de reconstrução
+
+### ⚙️ Gerenciamento Automático do Banco de Dados
+O sistema utiliza Aerich para gerenciar migrações automáticas do banco de dados:
+
+```bash
+# Aplicar migrações (executado automaticamente ao iniciar o serviço)
+python -m aerich migrate
+```
+
+### 📦 Deploy Otimizado
+Dois tipos de configuração disponíveis:
+1. **Local Development**: `docker-compose.yml` com volume mounting para hot-reloading
+2. **Production Build**: `LocalDockerfile` para imagens otimizadas
+
+## 🧪 Desenvolvimento
 
 ### Estrutura de Desenvolvimento
 - **Backend**: FastAPI + Tortoise ORM
 - **Banco de Dados**: MySQL
 - **Autenticação**: JWT (HS256)
 - **Cliente ESP32**: C++ com biblioteca personalizada
+- **Análise Predictiva**: LSTM Autoencoder com TensorFlow
 
 ### Comandos úteis para desenvolvimento:
 ```bash
@@ -149,8 +194,11 @@ flake8 .
 black .
 isort .
 
-# Build Docker image
-docker build -t pi4-api .
+# Treinar modelo de detecção de anomalias
+python model_training/train_anomaly_detector.py
+
+# Executar migracões do banco de dados
+python -m aerich migrate
 ```
 
 ## 📋 Requisitos do Sistema
@@ -172,3 +220,7 @@ Para produção, certifique-se de configurar uma chave secreta segura no `.env`.
 ## 📖 Licença
 
 Este projeto é licenciado sob a MIT License - veja o arquivo LICENSE para mais detalhes.
+
+✅ Desenvolvido como parte do Projeto Integrador 4 da Univesp (Universidade Virtual do Estado de São Paulo)
+
+🎓 Em parceria com a equipe acadêmica para aplicar conhecimentos em desenvolvimento full-stack e IoT.

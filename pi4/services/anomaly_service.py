@@ -12,7 +12,7 @@ from pi4.models.measurements import Measurement
 
 class AnomalyDetectionService:
     """Service class for anomaly detection functionality.
-    
+
     Note: This service fetches measurements with 5-minute intervals to match
     the training data pattern used for the LSTM autoencoder model.
     """
@@ -36,9 +36,7 @@ class AnomalyDetectionService:
             # Load the scaler
             scaler_path = "scaler.json"
             if not os.path.exists(scaler_path):
-                raise FileNotFoundError(
-                    f"Scaler file {scaler_path} not found"
-                )
+                raise FileNotFoundError(f"Scaler file {scaler_path} not found")
 
             with open(scaler_path, "r") as f:
                 # Handle the malformed JSON format from training script - it's two concatenated arrays
@@ -77,11 +75,13 @@ class AnomalyDetectionService:
             # Load dataset statistics if available (for better diagnostics)
             stats_path = "dataset_analysis.json"
             if os.path.exists(stats_path):
-                with open(stats_path, 'r') as f:
+                with open(stats_path, "r") as f:
                     try:
                         self.dataset_stats = json.load(f)
                     except Exception as e:
-                        print(f"Warning: Could not load dataset statistics: {e}")
+                        print(
+                            f"Warning: Could not load dataset statistics: {e}"
+                        )
                         self.dataset_stats = {}
 
             # Load threshold value from the training output
@@ -117,10 +117,13 @@ class AnomalyDetectionService:
             # Fetch more measurements than needed to account for interval filtering
             # We fetch 3x more to ensure we have enough after filtering
             fetch_count = count * 3
-            all_measurements = await Measurement.all().order_by("-timestamp").limit(
-                fetch_count
-            ).all()
-            
+            all_measurements = (
+                await Measurement.all()
+                .order_by("-timestamp")
+                .limit(fetch_count)
+                .all()
+            )
+
             # Apply 5-minute interval filtering (same logic as in measurements route)
             # Process in reverse order (newest first) then reverse back
             if all_measurements:
@@ -133,7 +136,9 @@ class AnomalyDetectionService:
                     # 5 minutes (300 seconds) after the last one
                     if (
                         last_timestamp is None
-                        or (measurement.timestamp - last_timestamp).total_seconds()
+                        or (
+                            measurement.timestamp - last_timestamp
+                        ).total_seconds()
                         >= 300  # 5 minutes = 300 seconds
                     ):
                         filtered_measurements.append(measurement)
@@ -141,12 +146,18 @@ class AnomalyDetectionService:
 
                 # Reverse to get chronological order (oldest first)
                 filtered_measurements.reverse()
-                
+
                 # Take the most recent measurements after filtering
-                filtered_measurements = filtered_measurements[-count:] if len(filtered_measurements) > count else filtered_measurements
-                
+                filtered_measurements = (
+                    filtered_measurements[-count:]
+                    if len(filtered_measurements) > count
+                    else filtered_measurements
+                )
+
                 # Convert to list of tuples (temperature, humidity)
-                return [(m.temperature, m.humidity) for m in filtered_measurements]
+                return [
+                    (m.temperature, m.humidity) for m in filtered_measurements
+                ]
             else:
                 return []
         except Exception as e:
@@ -167,17 +178,21 @@ class AnomalyDetectionService:
 
         # Build the sequence data - we need exactly sequence_length measurements
         sequence_data = []
-        
+
         # If we don't have enough historical data, pad with oldest ones
         if len(historical_measurements) < sequence_length - 1:
-            # Not enough historical data yet - pad with repeated oldest measurements  
+            # Not enough historical data yet - pad with repeated oldest measurements
             # This is a simplified approach; in production you might want to handle this differently
             if historical_measurements:
                 # Use the oldest measurement for padding
                 oldest_temp, oldest_hum = historical_measurements[0]
-                oldest_scaled = self.preprocess_single_measurement(oldest_temp, oldest_hum)[0]
+                oldest_scaled = self.preprocess_single_measurement(
+                    oldest_temp, oldest_hum
+                )[0]
                 # Pad with oldest measurements
-                padding_count = sequence_length - 1 - len(historical_measurements)
+                padding_count = (
+                    sequence_length - 1 - len(historical_measurements)
+                )
                 sequence_data.extend([oldest_scaled] * padding_count)
                 # Add all historical measurements
                 for temp, hum in historical_measurements:
@@ -185,21 +200,27 @@ class AnomalyDetectionService:
                     sequence_data.append(scaled)
             else:
                 # No historical data - use current measurement for all
-                current_scaled = self.preprocess_single_measurement(temperature, humidity)[0]
+                current_scaled = self.preprocess_single_measurement(
+                    temperature, humidity
+                )[0]
                 sequence_data = [current_scaled] * (sequence_length - 1)
         else:
             # Use the most recent measurements available (last sequence_length-1 measurements)
-            for temp, hum in historical_measurements[-(sequence_length - 1):]:
+            for temp, hum in historical_measurements[-(sequence_length - 1) :]:
                 scaled = self.preprocess_single_measurement(temp, hum)[0]
                 sequence_data.append(scaled)
 
         # Preprocess and append current measurement at the end
-        current_scaled = self.preprocess_single_measurement(temperature, humidity)[0]
+        current_scaled = self.preprocess_single_measurement(
+            temperature, humidity
+        )[0]
         sequence_data.append(current_scaled)
 
         # Ensure we have exactly sequence_length elements
         if len(sequence_data) != sequence_length:
-            raise ValueError(f"Sequence length mismatch: expected {sequence_length}, got {len(sequence_data)}")
+            raise ValueError(
+                f"Sequence length mismatch: expected {sequence_length}, got {len(sequence_data)}"
+            )
 
         # Convert to numpy array and reshape for model input [samples, time_steps, features]
         sequence = np.array(sequence_data, dtype=np.float32)
@@ -207,113 +228,181 @@ class AnomalyDetectionService:
 
         return sequence
 
-    def _classify_anomaly_type(self, temperature: float, humidity: float) -> Dict[str, any]:
+    def _classify_anomaly_type(
+        self, temperature: float, humidity: float
+    ) -> Dict[str, any]:
         """Classify the type of anomaly based on statistical analysis"""
         if not self.dataset_stats:
             # Return default classification if no stats available
             return {
                 "type": "unknown",
                 "confidence": 0.0,
-                "details": "Statistical analysis unavailable"
+                "details": "Statistical analysis unavailable",
             }
-        
-        temp_stats = self.dataset_stats.get('statistics', {}).get('temperature', {})
-        hum_stats = self.dataset_stats.get('statistics', {}).get('humidity', {})
-        
+
+        temp_stats = self.dataset_stats.get("statistics", {}).get(
+            "temperature", {}
+        )
+        hum_stats = self.dataset_stats.get("statistics", {}).get(
+            "humidity", {}
+        )
+
         # Get normal ranges
-        normal_temp = self.dataset_stats.get('normal_ranges', {}).get('temperature', {})
-        normal_hum = self.dataset_stats.get('normal_ranges', {}).get('humidity', {})
-        
-        temp_mean = temp_stats.get('mean', 0)
-        temp_std = temp_stats.get('std', 1)
-        hum_mean = hum_stats.get('mean', 0) 
-        hum_std = hum_stats.get('std', 1)
-        
+        normal_temp = self.dataset_stats.get("normal_ranges", {}).get(
+            "temperature", {}
+        )
+        normal_hum = self.dataset_stats.get("normal_ranges", {}).get(
+            "humidity", {}
+        )
+
+        temp_mean = temp_stats.get("mean", 0)
+        temp_std = temp_stats.get("std", 1)
+        hum_mean = hum_stats.get("mean", 0)
+        hum_std = hum_stats.get("std", 1)
+
+        # Get normal range boundaries
+        temp_normal_min = normal_temp.get(
+            "normal_min", temp_mean - 2 * temp_std
+        )
+        temp_normal_max = normal_temp.get(
+            "normal_max", temp_mean + 2 * temp_std
+        )
+        hum_normal_min = normal_hum.get("normal_min", hum_mean - 2 * hum_std)
+        hum_normal_max = normal_hum.get("normal_max", hum_mean + 2 * hum_std)
+
         # Calculate how many standard deviations away from normal
-        temp_deviation = abs(temperature - temp_mean) / (temp_std + 1e-8) if temp_std != 0 else 0
-        hum_deviation = abs(humidity - hum_mean) / (hum_std + 1e-8) if hum_std != 0 else 0
-        
+        temp_deviation = (
+            abs(temperature - temp_mean) / (temp_std + 1e-8)
+            if temp_std != 0
+            else 0
+        )
+        hum_deviation = (
+            abs(humidity - hum_mean) / (hum_std + 1e-8) if hum_std != 0 else 0
+        )
+
         # Classify anomaly based on deviation and ranges
         anomaly_type = "normal"
         confidence = 0.0
-        
-        # Determine the most significant deviation
-        if temperature > normal_temp.get('normal_max', temp_mean + 2*temp_std):
+
+        # Check for compound anomalies (both temperature and humidity out of normal range)
+        temp_high = temperature > temp_normal_max
+        temp_low = temperature < temp_normal_min
+        hum_high = humidity > hum_normal_max
+        hum_low = humidity < hum_normal_min
+
+        if temp_high and hum_high:
+            # High temperature and high humidity
+            anomaly_type = "high_temperature_high_humidity"
+            confidence = min((temp_deviation + hum_deviation) / 3, 1.0)
+        elif temp_high and hum_low:
+            # High temperature and low humidity
+            anomaly_type = "high_temperature_low_humidity"
+            confidence = min((temp_deviation + hum_deviation) / 3, 1.0)
+        elif temp_low and hum_high:
+            # Low temperature and high humidity
+            anomaly_type = "low_temperature_high_humidity"
+            confidence = min((temp_deviation + hum_deviation) / 3, 1.0)
+        elif temp_low and hum_low:
+            # Low temperature and low humidity
+            anomaly_type = "low_temperature_low_humidity"
+            confidence = min((temp_deviation + hum_deviation) / 3, 1.0)
+        elif temp_high:
+            # Only high temperature
             anomaly_type = "high_temperature"
             confidence = min(temp_deviation / 2, 1.0)
-        elif temperature < normal_temp.get('normal_min', temp_mean - 2*temp_std):
-            anomaly_type = "low_temperature" 
+        elif temp_low:
+            # Only low temperature
+            anomaly_type = "low_temperature"
             confidence = min(temp_deviation / 2, 1.0)
-        elif humidity > normal_hum.get('normal_max', hum_mean + 2*hum_std):
+        elif hum_high:
+            # Only high humidity
             anomaly_type = "high_humidity"
             confidence = min(hum_deviation / 2, 1.0)
-        elif humidity < normal_hum.get('normal_min', hum_mean - 2*hum_std):
+        elif hum_low:
+            # Only low humidity
             anomaly_type = "low_humidity"
             confidence = min(hum_deviation / 2, 1.0)
         else:
-            # Check if it's an unusual combination
-            temp_normal_range = [temp_mean - 2*temp_std, temp_mean + 2*temp_std]
-            hum_normal_range = [hum_mean - 2*hum_std, hum_mean + 2*hum_std]
-            
-            if (temperature > temp_normal_range[1] and humidity < hum_normal_range[0]) or \
-               (temperature < temp_normal_range[0] and humidity > hum_normal_range[1]):
+            # Check if it's an unusual combination within normal ranges
+            temp_normal_range = [temp_normal_min, temp_normal_max]
+            hum_normal_range = [hum_normal_min, hum_normal_max]
+
+            if (
+                temperature > temp_normal_range[1]
+                and humidity < hum_normal_range[0]
+            ) or (
+                temperature < temp_normal_range[0]
+                and humidity > hum_normal_range[1]
+            ):
                 anomaly_type = "unusual_combination"
                 confidence = min((temp_deviation + hum_deviation) / 4, 1.0)
-        
+
         # Add more detailed information
         details = {
-            'temperature': {
-                'value': temperature,
-                'normal_min': normal_temp.get('normal_min', temp_mean - 2*temp_std),
-                'normal_max': normal_temp.get('normal_max', temp_mean + 2*temp_std),
-                'deviation_from_mean': (temperature - temp_mean) / (temp_std + 1e-8)
+            "temperature": {
+                "value": temperature,
+                "normal_min": temp_normal_min,
+                "normal_max": temp_normal_max,
+                "deviation_from_mean": (temperature - temp_mean)
+                / (temp_std + 1e-8),
             },
-            'humidity': {
-                'value': humidity,
-                'normal_min': normal_hum.get('normal_min', hum_mean - 2*hum_std),
-                'normal_max': normal_hum.get('normal_max', hum_mean + 2*hum_std),
-                'deviation_from_mean': (humidity - hum_mean) / (hum_std + 1e-8)
-            }
+            "humidity": {
+                "value": humidity,
+                "normal_min": hum_normal_min,
+                "normal_max": hum_normal_max,
+                "deviation_from_mean": (humidity - hum_mean)
+                / (hum_std + 1e-8),
+            },
         }
-        
+
         return {
             "type": anomaly_type,
             "confidence": float(confidence),
-            "details": details
+            "details": details,
         }
 
-    def _analyze_anomaly_detailed(self, temperature: float, humidity: float, mse: float) -> Dict[str, any]:
+    def _analyze_anomaly_detailed(
+        self, temperature: float, humidity: float, mse: float
+    ) -> Dict[str, any]:
         """Provide detailed analysis of the detected anomaly"""
-        
+
         # Get basic classification
         classification = self._classify_anomaly_type(temperature, humidity)
-        
+
         # Analyze reconstruction error in detail
         error_details = {
             "reconstruction_error": float(mse),
             "threshold": float(self.threshold_value),
             "error_ratio_to_threshold": mse / (self.threshold_value + 1e-8),
-            "is_significantly_anomalous": bool(mse > self.threshold_value * 2)  # Significantly anomalous
+            "is_significantly_anomalous": bool(
+                mse > self.threshold_value * 2
+            ),  # Significantly anomalous
         }
-        
+
         # Get additional statistical context
-        temp_stats = self.dataset_stats.get('statistics', {}).get('temperature', {})
-        hum_stats = self.dataset_stats.get('statistics', {}).get('humidity', {})
-        
+        temp_stats = self.dataset_stats.get("statistics", {}).get(
+            "temperature", {}
+        )
+        hum_stats = self.dataset_stats.get("statistics", {}).get(
+            "humidity", {}
+        )
+
         return {
             "classification": classification,
             "error_analysis": error_details,
             "dataset_context": {
-                "total_measurements": self.dataset_stats.get('dataset_info', {}).get('total_measurements', 0),
+                "total_measurements": self.dataset_stats.get(
+                    "dataset_info", {}
+                ).get("total_measurements", 0),
                 "temperature_range": {
-                    "min": temp_stats.get('min', None),
-                    "max": temp_stats.get('max', None)
+                    "min": temp_stats.get("min", None),
+                    "max": temp_stats.get("max", None),
                 },
                 "humidity_range": {
-                    "min": hum_stats.get('min', None),
-                    "max": hum_stats.get('max', None)
-                }
-            }
+                    "min": hum_stats.get("min", None),
+                    "max": hum_stats.get("max", None),
+                },
+            },
         }
 
     async def predict_anomaly(self, temperature: float, humidity: float):
@@ -322,9 +411,11 @@ class AnomalyDetectionService:
             # Fetch the required number of historical measurements from database
             # We need 575 previous measurements plus current one = 72 total
             sequence_length = 72  # Same as used during training (6 hours)
-            
-            # Get exactly the amount needed for sequence creation 
-            historical_measurements = await self._fetch_recent_measurements(sequence_length - 1)
+
+            # Get exactly the amount needed for sequence creation
+            historical_measurements = await self._fetch_recent_measurements(
+                sequence_length - 1
+            )
 
             # Create sequence with proper historical context from database
             sequence = self._create_sequence_with_history(
@@ -339,16 +430,18 @@ class AnomalyDetectionService:
 
             # Check if it's anomalous
             is_anomalous = bool(mse > self.threshold_value)
-            
+
             result = {
                 "is_anomalous": is_anomalous,
                 "reconstruction_error": float(mse),
                 "threshold": float(self.threshold_value),
             }
-            
+
             # If anomalous, add detailed diagnostics
             if is_anomalous:
-                diagnosis = self._analyze_anomaly_detailed(temperature, humidity, mse)
+                diagnosis = self._analyze_anomaly_detailed(
+                    temperature, humidity, mse
+                )
                 result["diagnosis"] = diagnosis
 
             return result
